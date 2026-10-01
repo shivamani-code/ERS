@@ -4,67 +4,53 @@ A distributed emergency response platform designed for real-time caller detectio
 
 ---
 
-## 📱 Repository Structure
+## 🗂️ Complete Repository Structure
 
 ```
 ERS/
-├── EmergencyLocationApp/         # GPS Location Dispatcher & Emergency Dashboard App
+├── EmergencyLocationApp/         # GPS Location Dispatcher & Emergency Dashboard App (Android)
 │   ├── app/                      # Source code, assets, manifests, and configs
-│   │   ├── src/main/java/        # Kotlin source files
-│   │   ├── src/main/res/         # UI layouts, drawables, strings
-│   │   └── google-services.json  # Firebase configuration
-│   ├── apk/                      # Ready-to-install Android APK
-│   │   └── EmergencyLocationApp-debug.apk
-│   └── build.gradle.kts          # Gradle build script
+│   ├── apk/                      # Ready-to-install Android APK (EmergencyLocationApp-debug.apk)
+│   └── build.gradle.kts
 │
-├── EmergencyCallGatewayApp/      # Incoming Call Monitoring & Trigger Gateway App
+├── EmergencyCallGatewayApp/      # Incoming Call Monitoring & Trigger Gateway App (Android)
 │   ├── app/                      # Source code, assets, manifests, and configs
-│   │   ├── src/main/java/        # Kotlin source files
-│   │   ├── src/main/res/         # UI layouts, drawables, strings
-│   │   └── google-services.json  # Firebase configuration
-│   ├── apk/                      # Ready-to-install Android APK
-│   │   └── EmergencyCallGatewayApp-debug.apk
-│   └── build.gradle.kts          # Gradle build script
+│   ├── apk/                      # Ready-to-install Android APK (EmergencyCallGatewayApp-debug.apk)
+│   └── build.gradle.kts
 │
-├── index.html                    # Real-time Web Telemetry & Map Monitor Dashboard
+├── EmergencyAmbulanceConsole/    # Ambulance Driver Console & Interactive Map Dashboard (Web)
+│   ├── index.html                # High-tech Leaflet map & telemetry monitor interface
+│   ├── Ambulance Driver Console.lnk # Desktop app shortcut
+│   └── README.md
+│
+├── EmergencyBackend/             # Real-time Call-to-Location Dispatch Server (Node.js)
+│   ├── server.js                 # Firestore snapshot listener & user matcher
+│   ├── package.json              # Node.js dependencies
+│   ├── backend_log.txt           # Supervisor log records
+│   └── serviceAccountKey.example.json # Firebase Admin credentials template
+│
+├── EmergencyLogMonitor_Web/      # Real-time Location Log & Stream Monitor (Web)
+│   ├── index.html                # Live Firestore location streaming dashboard
+│   ├── backend_log.txt           # Backend runtime execution log
+│   └── README.md
+│
 ├── .gitignore
 └── README.md
 ```
 
 ---
 
-## 🚀 The Applications
-
-### 1. `EmergencyLocationApp` (GPS Dispatcher)
-* **Package**: `com.example.myapplication`
-* **APK**: [`EmergencyLocationApp/apk/EmergencyLocationApp-debug.apk`](EmergencyLocationApp/apk/EmergencyLocationApp-debug.apk)
-* **Key Components**:
-  * `RegistrationActivity.kt`: Registers the device token, user name, and phone number into Firebase Firestore (`users` collection).
-  * `DashboardActivity.kt`: Emergency control dashboard displaying live GPS status, connection state, manual diagnostic triggers, and coordinates.
-  * `TriggerListenerService.kt`: Persistent background foreground service that monitors the Firestore `app_triggers` collection in real-time.
-  * `LocationService.kt`: Awakens when a `SEND_LOCATION` trigger is detected, interfaces with hardware GPS sensors via `GPSHelper.kt`, and uploads precision latitude/longitude/accuracy to Firestore's `locations` collection.
-  * `FirestoreHelper.kt`: Firestore database helper for real-time document manipulation.
-
-### 2. `EmergencyCallGatewayApp` (Call Monitor Gateway)
-* **Package**: `com.example.myapplication2`
-* **APK**: [`EmergencyCallGatewayApp/apk/EmergencyCallGatewayApp-debug.apk`](EmergencyCallGatewayApp/apk/EmergencyCallGatewayApp-debug.apk)
-* **Key Components**:
-  * `CallReceiver.kt`: Intercepts `TelephonyManager.ACTION_PHONE_STATE_CHANGED`. When an emergency call rings, it extracts the caller's phone number (with a fallback query to Android's `CallLog`) and immediately writes an entry into Firestore's `incoming_calls` collection.
-  * `CallMonitoringService.kt`: Foreground service ensuring the call listener remains alive and active in the background.
-  * `MainActivity.kt`: User interface providing monitoring start/stop controls, status displays, and runtime permission management (Call Log, Phone State, Notifications).
-
----
-
-## 🔄 System Architecture Flow
+## 🔄 Complete System Lifecycle
 
 ```mermaid
 sequenceDiagram
     autonumber
     participant CallerApp as EmergencyCallGatewayApp (Call Gateway)
     participant Firestore as Firebase Firestore
-    participant Backend as Emergency Dispatch Server
-    participant LocApp as EmergencyLocationApp (Location Dispatcher)
-    participant Dashboard as Web Telemetry Monitor (index.html)
+    participant Backend as EmergencyBackend (Supervisor Server)
+    participant LocApp as EmergencyLocationApp (GPS Dispatcher)
+    participant AmbConsole as EmergencyAmbulanceConsole (Driver Dashboard)
+    participant LogMonitor as EmergencyLogMonitor_Web (Log Feed)
 
     CallerApp->>Firestore: Writes caller phone number to 'incoming_calls'
     Firestore->>Backend: Real-time listener triggers for new call document
@@ -73,40 +59,32 @@ sequenceDiagram
     Firestore->>LocApp: TriggerListenerService receives pending trigger
     LocApp->>LocApp: LocationService acquires high-accuracy GPS coordinates
     LocApp->>Firestore: Writes lat, lng, accuracy, timestamp to 'locations'
-    Firestore->>Dashboard: Real-time map updates with live marker and caller info
+    Firestore->>AmbConsole: Real-time map updates with live marker and route
+    Firestore->>LogMonitor: Real-time event log appends new coordinate record
 ```
 
 ---
 
-## 📦 How to Install the APKs
+## 🚀 Component Breakdown
 
-You can install both applications directly onto an Android device using `adb`:
+### 1. `EmergencyLocationApp` (Android)
+* **Role**: Runs on the user's phone.
+* **Function**: Background service (`TriggerListenerService`) listens for dispatch triggers. When triggered by the backend, `LocationService` fetches live GPS coordinates and pushes them to Firestore.
+* **APK**: [`EmergencyLocationApp/apk/EmergencyLocationApp-debug.apk`](EmergencyLocationApp/apk/EmergencyLocationApp-debug.apk)
 
-```bash
-# Install the Location Dispatcher App
-adb install -r EmergencyLocationApp/apk/EmergencyLocationApp-debug.apk
+### 2. `EmergencyCallGatewayApp` (Android)
+* **Role**: Runs on the gateway receiver phone.
+* **Function**: `CallReceiver` intercepts incoming phone calls, extracts the caller number, and pushes the call to `incoming_calls` in Firestore.
+* **APK**: [`EmergencyCallGatewayApp/apk/EmergencyCallGatewayApp-debug.apk`](EmergencyCallGatewayApp/apk/EmergencyCallGatewayApp-debug.apk)
 
-# Install the Call Gateway App
-adb install -r EmergencyCallGatewayApp/apk/EmergencyCallGatewayApp-debug.apk
-```
+### 3. `EmergencyAmbulanceConsole` (Web)
+* **Role**: Primary UI for emergency responders and ambulance drivers.
+* **Function**: Visualizes live GPS markers on Leaflet maps, sounds alarms, and displays real-time caller telemetry.
 
----
+### 4. `EmergencyBackend` (Node.js)
+* **Role**: Cloud / local server supervisor.
+* **Function**: Continuously listens to `incoming_calls`, looks up caller profiles in `users`, and dispatches `SEND_LOCATION` triggers into `app_triggers`.
 
-## 🛠️ Building from Source
-
-Prerequisites:
-* Android SDK (API 34+)
-* Java Development Kit (JDK 17+)
-* Gradle Wrapper (included)
-
-To compile either app from the terminal:
-
-```bash
-# Build Location App
-cd EmergencyLocationApp
-./gradlew assembleDebug
-
-# Build Call Gateway App
-cd ../EmergencyCallGatewayApp
-./gradlew assembleDebug
-```
+### 5. `EmergencyLogMonitor_Web` (Web)
+* **Role**: Operations log monitor.
+* **Function**: Provides a real-time event feed of all recorded coordinates and server execution status.

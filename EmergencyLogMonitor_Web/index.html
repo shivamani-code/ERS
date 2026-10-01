@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Emergency Firebase Monitor</title>
+    <style>
+        :root {
+            --bg-dark: #121212;
+            --panel-bg: #1e1e1e;
+            --card-bg: #2a2a2a;
+            --text-main: #ffffff;
+            --text-muted: #aaaaaa;
+            --accent-red: #e53935;
+            --status-ok: #4caf50;
+            --border-color: #333;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-dark);
+            color: var(--text-main);
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            background-color: var(--panel-bg);
+            border-bottom: 1px solid var(--border-color);
+            padding: 20px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.5);
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            color: var(--accent-red);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .status-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: var(--text-muted); /* Default loading */
+            transition: background-color 0.3s;
+        }
+
+        .status-indicator.connected {
+            background-color: var(--status-ok);
+            box-shadow: 0 0 10px var(--status-ok);
+        }
+
+        .status-indicator.error {
+            background-color: var(--accent-red);
+            box-shadow: 0 0 10px var(--accent-red);
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+
+        .metrics {
+            display: flex;
+            gap: 20px;
+            font-size: 1.1rem;
+            font-weight: bold;
+        }
+
+        .metrics span {
+            color: var(--accent-red);
+        }
+
+        main {
+            flex: 1;
+            padding: 30px;
+            overflow-y: auto;
+        }
+
+        #emergency-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+            gap: 20px;
+        }
+
+        .emergency-card {
+            background-color: var(--card-bg);
+            border-radius: 8px;
+            padding: 20px;
+            border-left: 4px solid var(--accent-red);
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            animation: slideIn 0.3s ease-out;
+        }
+
+        @keyframes slideIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+            margin-bottom: 5px;
+        }
+
+        .card-phone {
+            font-size: 1.2rem;
+            font-weight: bold;
+            color: var(--accent-red);
+        }
+
+        .card-time {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .data-row {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.95rem;
+        }
+
+        .data-label {
+            color: var(--text-muted);
+        }
+
+        .data-value {
+            font-family: monospace;
+            font-size: 1rem;
+        }
+
+        .empty-state {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 50px;
+            color: var(--text-muted);
+            font-size: 1.2rem;
+            background-color: var(--panel-bg);
+            border-radius: 8px;
+            border: 1px dashed var(--border-color);
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>
+            <div class="status-indicator" id="status-dot"></div>
+            Firebase Location Monitor
+        </h1>
+        <div class="metrics">
+            Total Records: <span id="metric-total">0</span>
+        </div>
+    </header>
+
+    <main>
+        <div id="emergency-grid">
+            <div class="empty-state" id="empty-message">
+                Connecting to Firebase & waiting for location data...
+            </div>
+        </div>
+    </main>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
+        import { 
+            getFirestore, 
+            collection, 
+            onSnapshot, 
+            query, 
+            orderBy 
+        } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
+
+        // Firebase Configuration for emergency-response-11a1c
+        const firebaseConfig = {
+            apiKey: "AIzaSyAO0BsO9oBa9EYjh-aOlP5Pa8qHNal-DpI",
+            authDomain: "emergency-response-11a1c.firebaseapp.com",
+            projectId: "emergency-response-11a1c",
+            storageBucket: "emergency-response-11a1c.firebasestorage.app",
+            messagingSenderId: "345734330880",
+            appId: "1:345734330880:web:f4f3c47ea5a5cde88476e5",
+            measurementId: "G-JDFCR543P9"
+        };
+
+        // DOM Elements
+        const gridContainer = document.getElementById('emergency-grid');
+        const emptyMessage = document.getElementById('empty-message');
+        const metricTotal = document.getElementById('metric-total');
+        const statusDot = document.getElementById('status-dot');
+
+        let isFirstLoad = true;
+
+        try {
+            // Initialize Firebase
+            const app = initializeApp(firebaseConfig);
+            const db = getFirestore(app);
+            
+            // Query locations collection, newest first
+            const q = query(collection(db, "locations"), orderBy("timestamp", "desc"));
+            
+            // Listen for realtime updates
+            onSnapshot(q, (snapshot) => {
+                // Update connection status visual
+                statusDot.className = 'status-indicator connected';
+
+                if (isFirstLoad) {
+                    if (!snapshot.empty && emptyMessage) {
+                        emptyMessage.remove();
+                    }
+                    isFirstLoad = false;
+                }
+
+                // Update total count
+                metricTotal.textContent = snapshot.size;
+
+                if (snapshot.empty && !document.getElementById('empty-message')) {
+                    gridContainer.innerHTML = `<div class="empty-state" id="empty-message">Database is connected, but the 'locations' collection is empty.</div>`;
+                    return;
+                }
+
+                // Handle document additions, modifications, and removals natively
+                snapshot.docChanges().forEach((change) => {
+                    if (change.type === "added" || change.type === "modified") {
+                        const data = change.doc.data();
+                        const docId = change.doc.id;
+                        
+                        // Remove old card if it's a modification
+                        if (change.type === "modified") {
+                            const oldCard = document.getElementById(`card-${docId}`);
+                            if (oldCard) oldCard.remove();
+                        }
+                        
+                        renderCard(data, docId);
+                    }
+                    
+                    if (change.type === "removed") {
+                        const cardToRemove = document.getElementById(`card-${change.doc.id}`);
+                        if (cardToRemove) cardToRemove.remove();
+                    }
+                });
+            }, (error) => {
+                console.error("Firestore Listen Error:", error);
+                statusDot.className = 'status-indicator error';
+                gridContainer.innerHTML = `<div class="empty-state" style="color: var(--accent-red); border-color: var(--accent-red);">
+                    Connection Error. Check console for details.<br>
+                    Ensure your database rules allow read access.
+                </div>`;
+            });
+
+        } catch (error) {
+            console.error("Firebase Initialization Error:", error);
+            statusDot.className = 'status-indicator error';
+            emptyMessage.innerHTML = "Failed to initialize Firebase app. Check configuration.";
+        }
+
+        // Render individual document to a card
+        function renderCard(data, id) {
+            // Remove empty message if it exists
+            const emptyEl = document.getElementById('empty-message');
+            if (emptyEl) emptyEl.remove();
+
+            const card = document.createElement('div');
+            card.className = 'emergency-card';
+            card.id = `card-${id}`;
+            
+            // Fallbacks for missing data fields
+            const phoneStr = data.phone || data.user_id || "Unknown Source";
+            const latStr = data.latitude !== undefined ? data.latitude : "N/A";
+            const lngStr = data.longitude !== undefined ? data.longitude : "N/A";
+            const accStr = data.accuracy !== undefined ? `±${data.accuracy}m` : "N/A";
+            const timeStr = formatTime(data.timestamp);
+
+            card.innerHTML = `
+                <div class="card-header">
+                    <span class="card-phone">${phoneStr}</span>
+                    <span class="card-time">${timeStr}</span>
+                </div>
+                <div class="data-row">
+                    <span class="data-label">Latitude</span>
+                    <span class="data-value">${latStr}</span>
+                </div>
+                <div class="data-row">
+                    <span class="data-label">Longitude</span>
+                    <span class="data-value">${lngStr}</span>
+                </div>
+                <div class="data-row">
+                    <span class="data-label">Accuracy</span>
+                    <span class="data-value">${accStr}</span>
+                </div>
+            `;
+
+            // Prepend so the newest data appears at the top of the grid
+            gridContainer.insertBefore(card, gridContainer.firstChild);
+        }
+
+        // Format Firestore Timestamps or generic strings safely
+        function formatTime(timestamp) {
+            if (!timestamp) return "No Timestamp";
+            
+            // Handle Firestore Timestamp object natively
+            const dateObj = (timestamp && typeof timestamp.toDate === 'function') 
+                ? timestamp.toDate() 
+                : new Date(timestamp);
+                
+            if (isNaN(dateObj)) return String(timestamp);
+            
+            return dateObj.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' }) + 
+                   " (" + dateObj.toLocaleDateString() + ")";
+        }
+    </script>
+</body>
+</html>

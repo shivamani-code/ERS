@@ -23,6 +23,14 @@ build/
 local.properties
 **/local.properties
 
+# Secrets & Credentials
+serviceAccountKey.json
+**/serviceAccountKey.json
+
+# Node.js
+node_modules/
+**/node_modules/
+
 # OS generated files
 .DS_Store
 Thumbs.db

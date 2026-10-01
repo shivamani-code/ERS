@@ -1,0 +1,2440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Emergency Location Monitor Dashboard</title>
+  
+  <!-- Font Setup: Outfit & Inter for high-tech telemetry appearance -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  
+  <!-- Leaflet CSS for Map Tiles -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+  
+  <!-- Modern Dashboard CSS Styling -->
+  <style>
+    :root {
+      --bg-color: #080c14;
+      --panel-bg: rgba(16, 22, 35, 0.75);
+      --panel-border: rgba(255, 255, 255, 0.08);
+      --panel-border-hover: rgba(255, 255, 255, 0.15);
+      
+      --text-primary: #f8fafc;
+      --text-secondary: #cbd5e1;
+      --text-muted: #64748b;
+      
+      --accent-red: #ef4444;
+      --accent-red-glow: rgba(239, 68, 68, 0.35);
+      --accent-blue: #3b82f6;
+      --accent-blue-glow: rgba(59, 130, 246, 0.35);
+      --accent-green: #10b981;
+      --accent-green-glow: rgba(16, 185, 129, 0.35);
+      --accent-yellow: #f59e0b;
+      --accent-yellow-glow: rgba(245, 158, 11, 0.35);
+      --accent-purple: #8b5cf6;
+      --accent-purple-glow: rgba(139, 92, 246, 0.35);
+      
+      --font-family: 'Outfit', 'Inter', sans-serif;
+      --transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      background-color: var(--bg-color);
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(59, 130, 246, 0.06) 0px, transparent 50%),
+        radial-gradient(at 50% 0%, rgba(239, 68, 68, 0.06) 0px, transparent 50%),
+        radial-gradient(at 100% 0%, rgba(139, 92, 246, 0.04) 0px, transparent 50%);
+      color: var(--text-primary);
+      font-family: var(--font-family);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      padding: 16px;
+    }
+
+    /* Scrollbars Styling */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: rgba(255, 255, 255, 0.01);
+    }
+    ::-webkit-scrollbar-thumb {
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    /* Dashboard Container Grid */
+    .dashboard-container {
+      display: grid;
+      grid-template-rows: auto auto 1fr auto;
+      gap: 16px;
+      height: 100%;
+      width: 100%;
+      max-width: 1800px;
+      margin: 0 auto;
+    }
+
+    /* Header Styling */
+    .dashboard-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      padding: 12px 24px;
+      border-radius: 12px;
+      backdrop-filter: blur(16px);
+      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4);
+    }
+    .header-left {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .pulse-glow-dot {
+      width: 12px;
+      height: 12px;
+      background-color: var(--accent-red);
+      border-radius: 50%;
+      box-shadow: 0 0 12px var(--accent-red);
+      animation: alert-pulse 1s infinite alternate;
+    }
+    @keyframes alert-pulse {
+      0% { transform: scale(0.8); opacity: 0.6; }
+      100% { transform: scale(1.2); opacity: 1; }
+    }
+    .header-titles h1 {
+      font-size: 1.3rem;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+      background: linear-gradient(135deg, #ffffff 0%, #ffc4c4 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+    .header-titles p {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+    .header-status-pills {
+      display: flex;
+      gap: 12px;
+    }
+    .status-pill {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      transition: var(--transition);
+    }
+    .status-pill .indicator-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      transition: var(--transition);
+    }
+    /* Status Pill Modifier Classes */
+    .status-pill[data-status="connecting"] .indicator-dot {
+      background-color: var(--accent-yellow);
+      box-shadow: 0 0 8px var(--accent-yellow-glow);
+      animation: marker-ping 1.2s infinite;
+    }
+    .status-pill[data-status="connected"] .indicator-dot,
+    .status-pill[data-status="active"] .indicator-dot {
+      background-color: var(--accent-green);
+      box-shadow: 0 0 8px var(--accent-green-glow);
+      animation: none;
+    }
+    .status-pill[data-status="failed"] .indicator-dot,
+    .status-pill[data-status="error"] .indicator-dot {
+      background-color: var(--accent-red);
+      box-shadow: 0 0 8px var(--accent-red-glow);
+      animation: none;
+    }
+
+    /* Metrics Grid */
+    .metrics-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 16px;
+    }
+    .metric-card {
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 12px;
+      padding: 16px;
+      backdrop-filter: blur(16px);
+      position: relative;
+      overflow: hidden;
+      transition: var(--transition);
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    }
+    .metric-card:hover {
+      transform: translateY(-2px);
+      border-color: var(--panel-border-hover);
+    }
+    .metric-card::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 3px;
+    }
+    .metric-card.total::after { background: var(--accent-red); }
+    .metric-card.valid::after { background: var(--accent-green); }
+    .metric-card.invalid::after { background: var(--accent-yellow); }
+    .metric-card.time::after { background: var(--accent-blue); }
+    .metric-card.coords::after { background: var(--accent-purple); }
+
+    .metric-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+    .metric-card-title {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.75px;
+      color: var(--text-muted);
+      font-weight: 700;
+    }
+    .metric-card-header i {
+      font-size: 0.95rem;
+    }
+    .metric-card.total i { color: var(--accent-red); }
+    .metric-card.valid i { color: var(--accent-green); }
+    .metric-card.invalid i { color: var(--accent-yellow); }
+    .metric-card.time i { color: var(--accent-blue); }
+    .metric-card.coords i { color: var(--accent-purple); }
+
+    .metric-card-value {
+      font-size: 1.7rem;
+      font-weight: 800;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+      font-variant-numeric: tabular-nums;
+      text-shadow: 0 0 10px rgba(255, 255, 255, 0.05);
+    }
+    .metric-card-footer {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      font-weight: 500;
+      text-overflow: ellipsis;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+
+    /* Main Section Layout */
+    .main-layout {
+      display: grid;
+      grid-template-columns: 360px 1fr 360px;
+      gap: 16px;
+      min-height: 0;
+    }
+
+    .flex-panel {
+      background: var(--panel-bg);
+      border: 1px solid var(--panel-border);
+      border-radius: 12px;
+      backdrop-filter: blur(16px);
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      overflow: hidden;
+      box-shadow: 0 4px 30px rgba(0, 0, 0, 0.3);
+    }
+
+    .panel-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 16px;
+      border-bottom: 1px solid var(--panel-border);
+      background: rgba(255, 255, 255, 0.01);
+    }
+    .panel-header h2 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .panel-header h2 i {
+      color: var(--accent-red);
+    }
+
+    /* Search & Filter bar for Left Panel */
+    .search-filter-container {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--panel-border);
+      background: rgba(0, 0, 0, 0.15);
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .search-input-box {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+    .search-input-box input {
+      width: 100%;
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      padding: 8px 32px 8px 30px;
+      color: var(--text-primary);
+      font-family: var(--font-family);
+      font-size: 0.8rem;
+      transition: var(--transition);
+    }
+    .search-input-box input:focus {
+      outline: none;
+      border-color: var(--accent-blue);
+      box-shadow: 0 0 10px rgba(59, 130, 246, 0.15);
+      background: rgba(255, 255, 255, 0.05);
+    }
+    .search-input-box .fa-search {
+      position: absolute;
+      left: 10px;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+    }
+    .search-clear-btn {
+      position: absolute;
+      right: 10px;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 0.75rem;
+      padding: 4px;
+    }
+    .search-clear-btn:hover {
+      color: var(--text-primary);
+    }
+    .filter-pills {
+      display: flex;
+      gap: 6px;
+      overflow-x: auto;
+      padding-bottom: 2px;
+    }
+    .filter-pills::-webkit-scrollbar {
+      display: none;
+    }
+    .filter-btn {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--panel-border);
+      color: var(--text-secondary);
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 0.7rem;
+      font-weight: 600;
+      cursor: pointer;
+      white-space: nowrap;
+      transition: var(--transition);
+    }
+    .filter-btn:hover {
+      background: rgba(255, 255, 255, 0.07);
+      color: var(--text-primary);
+    }
+    .filter-btn.active {
+      background: var(--accent-red);
+      border-color: var(--accent-red);
+      color: #fff;
+      box-shadow: 0 2px 8px var(--accent-red-glow);
+    }
+
+    /* Left Panel: Scrollable location list */
+    .location-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .location-list-placeholder {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      text-align: center;
+      padding: 24px;
+      color: var(--text-muted);
+    }
+    .location-list-placeholder i {
+      font-size: 2.2rem;
+      color: var(--accent-red);
+      opacity: 0.6;
+      margin-bottom: 12px;
+    }
+    .location-list-placeholder p {
+      font-size: 0.8rem;
+      line-height: 1.4;
+    }
+
+    /* Left Panel Item Alert Card */
+    .alert-card {
+      background: rgba(255, 255, 255, 0.02);
+      border: 1px solid var(--panel-border);
+      border-radius: 8px;
+      padding: 12px;
+      cursor: pointer;
+      position: relative;
+      transition: var(--transition);
+    }
+    .alert-card:hover {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: var(--panel-border-hover);
+      transform: scale(1.01);
+    }
+    .alert-card.selected {
+      background: rgba(239, 68, 68, 0.04);
+      border-color: var(--accent-red);
+      box-shadow: 0 0 12px rgba(239, 68, 68, 0.12);
+    }
+    .alert-card.selected::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      height: 100%;
+      width: 4px;
+      background: var(--accent-red);
+      border-radius: 8px 0 0 8px;
+    }
+    .alert-card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+    .alert-phone {
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+    .badge {
+      font-size: 0.6rem;
+      font-weight: 700;
+      padding: 2px 6px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .badge.valid {
+      background: rgba(16, 185, 129, 0.12);
+      border: 1px solid rgba(16, 185, 129, 0.2);
+      color: var(--accent-green);
+    }
+    .badge.invalid {
+      background: rgba(245, 158, 11, 0.12);
+      border: 1px solid rgba(245, 158, 11, 0.2);
+      color: var(--accent-yellow);
+    }
+    .alert-uid {
+      font-family: monospace;
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      text-overflow: ellipsis;
+      overflow: hidden;
+      white-space: nowrap;
+    }
+    .alert-coordinates {
+      font-size: 0.75rem;
+      color: var(--text-secondary);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin-bottom: 8px;
+    }
+    .alert-coordinates i {
+      font-size: 0.7rem;
+      color: var(--text-muted);
+    }
+    .alert-footer {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.7rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+    .alert-accuracy {
+      background: rgba(59, 130, 246, 0.12);
+      color: var(--accent-blue);
+      padding: 1px 5px;
+      border-radius: 3px;
+      font-weight: 600;
+    }
+
+    /* Map Panel (Center) */
+    .map-panel {
+      position: relative;
+    }
+    .map-header-actions {
+      display: flex;
+      gap: 8px;
+      align-items: center;
+    }
+    .map-btn {
+      background: rgba(255, 255, 255, 0.04);
+      border: 1px solid var(--panel-border);
+      color: var(--text-secondary);
+      font-family: var(--font-family);
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 6px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: var(--transition);
+    }
+    .map-btn:hover {
+      background: rgba(255, 255, 255, 0.09);
+      color: var(--text-primary);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+    .map-btn:active {
+      transform: translateY(1px);
+    }
+    /* Specific Toolbar Buttons style */
+    #refresh-view-btn:hover { color: var(--accent-blue); border-color: var(--accent-blue); }
+    #center-map-btn:hover { color: var(--accent-green); border-color: var(--accent-green); }
+    #clear-selection-btn:hover { color: var(--accent-yellow); border-color: var(--accent-yellow); }
+    #copy-latest-coords-btn:hover { color: var(--accent-purple); border-color: var(--accent-purple); }
+
+    .map-container {
+      flex: 1;
+      width: 100%;
+      height: 100%;
+      background: #0f131a;
+      z-index: 1;
+    }
+    
+    /* Map Floating Status Banner Overlay */
+    .map-status-banner {
+      position: absolute;
+      top: 70px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(15, 23, 42, 0.9);
+      border: 1px solid var(--accent-yellow);
+      color: var(--text-primary);
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.5);
+      backdrop-filter: blur(8px);
+      pointer-events: none;
+      animation: bannerFadeIn 0.3s ease;
+      text-align: center;
+    }
+    .map-status-banner.error-style {
+      border-color: var(--accent-red);
+      background: rgba(30, 10, 10, 0.95);
+    }
+    .map-status-banner.success-style {
+      border-color: var(--accent-green);
+      background: rgba(10, 30, 20, 0.95);
+    }
+    .map-status-banner.hidden {
+      display: none !important;
+    }
+    @keyframes bannerFadeIn {
+      from { opacity: 0; transform: translate(-50%, -10px); }
+      to { opacity: 1; transform: translate(-50%, 0); }
+    }
+
+    /* Selected Details Panel (Right) */
+    .details-panel {
+      padding: 16px;
+    }
+    .details-scrollable {
+      flex: 1;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+    }
+    .details-empty-state {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      text-align: center;
+      color: var(--text-muted);
+      padding: 24px;
+    }
+    .radar-animation-box {
+      position: relative;
+      width: 110px;
+      height: 110px;
+      border-radius: 50%;
+      border: 1px solid rgba(239, 68, 68, 0.15);
+      margin-bottom: 24px;
+      background: 
+        radial-gradient(circle, transparent 20%, rgba(239, 68, 68, 0.01) 21%, rgba(239, 68, 68, 0.01) 39%, transparent 40%),
+        radial-gradient(circle, transparent 50%, rgba(239, 68, 68, 0.01) 51%, rgba(239, 68, 68, 0.01) 69%, transparent 70%);
+    }
+    .radar-animation-box::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 8px;
+      height: 8px;
+      background-color: var(--accent-red);
+      border-radius: 50%;
+      transform: translate(-50%, -50%);
+      box-shadow: 0 0 10px var(--accent-red);
+    }
+    .radar-spinning-beam {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background: conic-gradient(from 0deg, transparent 50%, rgba(239, 68, 68, 0.12) 100%);
+      animation: radar-sweep 2.5s linear infinite;
+    }
+    @keyframes radar-sweep {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .details-empty-state h3 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 6px;
+    }
+    .details-empty-state p {
+      font-size: 0.75rem;
+      line-height: 1.45;
+    }
+
+    /* Filled details panel styling */
+    .details-active-state {
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      justify-content: space-between;
+    }
+    .details-active-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 12px;
+      border-bottom: 1px solid var(--panel-border);
+      margin-bottom: 16px;
+    }
+    .details-phone {
+      font-size: 1.15rem;
+      font-weight: 800;
+      color: var(--text-primary);
+      letter-spacing: 0.5px;
+    }
+    .telemetry-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      flex: 1;
+    }
+    .telemetry-row {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      background: rgba(255, 255, 255, 0.01);
+      border: 1px solid rgba(255, 255, 255, 0.02);
+      padding: 8px 12px;
+      border-radius: 8px;
+    }
+    .telemetry-row:hover {
+      background: rgba(255, 255, 255, 0.03);
+    }
+    .telemetry-label {
+      font-size: 0.68rem;
+      font-weight: 700;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .telemetry-label i {
+      font-size: 0.75rem;
+    }
+    .telemetry-value-box {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .telemetry-value {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+    .telemetry-value.mono {
+      font-family: monospace;
+      font-size: 0.78rem;
+      color: var(--text-secondary);
+    }
+    .telemetry-value.invalid-txt {
+      color: var(--accent-yellow);
+      font-style: italic;
+    }
+    .telemetry-copy-btn {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      cursor: pointer;
+      font-size: 0.78rem;
+      padding: 4px;
+      transition: var(--transition);
+    }
+    .telemetry-copy-btn:hover {
+      color: var(--text-primary);
+    }
+    .details-action-buttons {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin-top: 16px;
+      padding-top: 16px;
+      border-top: 1px solid var(--panel-border);
+    }
+    .action-btn-link {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px;
+      border-radius: 8px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-decoration: none;
+      cursor: pointer;
+      text-align: center;
+      box-sizing: border-box;
+      border: 1px solid transparent;
+      transition: var(--transition);
+    }
+    .btn-maps {
+      background: var(--accent-red);
+      color: #ffffff;
+      box-shadow: 0 4px 10px var(--accent-red-glow);
+    }
+    .btn-maps:hover {
+      background: #ff5050;
+      box-shadow: 0 6px 14px rgba(239, 68, 68, 0.45);
+    }
+    .btn-maps.disabled {
+      background: rgba(255, 255, 255, 0.05) !important;
+      color: var(--text-muted) !important;
+      box-shadow: none !important;
+      border: 1px solid var(--panel-border) !important;
+      cursor: not-allowed !important;
+      pointer-events: none;
+    }
+    .btn-copy {
+      background: rgba(255, 255, 255, 0.03);
+      border: 1px solid var(--panel-border);
+      color: var(--text-primary);
+    }
+    .btn-copy:hover {
+      background: rgba(255, 255, 255, 0.07);
+      border-color: rgba(255, 255, 255, 0.18);
+    }
+    .btn-copy.disabled {
+      color: var(--text-muted) !important;
+      cursor: not-allowed !important;
+      opacity: 0.6;
+    }
+    .btn-center {
+      background: rgba(59, 130, 246, 0.08);
+      border: 1px solid rgba(59, 130, 246, 0.18);
+      color: var(--accent-blue);
+    }
+    .btn-center:hover {
+      background: rgba(59, 130, 246, 0.15);
+      border-color: var(--accent-blue);
+      color: #ffffff;
+    }
+    .btn-center.disabled {
+      color: var(--text-muted) !important;
+      border-color: var(--panel-border) !important;
+      background: transparent !important;
+      cursor: not-allowed !important;
+      opacity: 0.6;
+    }
+
+    /* Debug Console Panel (Bottom) */
+    .debug-console-panel {
+      height: 175px;
+      transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .debug-console-panel.collapsed {
+      height: 52px;
+    }
+    .debug-console-panel.collapsed .debug-panel-stats-bar,
+    .debug-console-panel.collapsed .debug-panel-logs {
+      display: none;
+    }
+    .debug-console-title-wrap {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .debug-icon-spin {
+      color: var(--accent-blue);
+      font-size: 0.8rem;
+    }
+    .debug-console-actions {
+      display: flex;
+      gap: 8px;
+    }
+    .debug-btn-action {
+      background: transparent;
+      border: none;
+      color: var(--text-muted);
+      font-size: 0.72rem;
+      font-weight: 600;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 8px;
+      border-radius: 4px;
+      transition: var(--transition);
+    }
+    .debug-btn-action:hover {
+      background: rgba(255, 255, 255, 0.05);
+      color: var(--text-primary);
+    }
+    
+    .debug-panel-stats-bar {
+      display: flex;
+      gap: 16px;
+      padding: 6px 16px;
+      background: rgba(0, 0, 0, 0.2);
+      border-bottom: 1px solid var(--panel-border);
+      font-size: 0.7rem;
+      color: var(--text-secondary);
+    }
+    .debug-stat-pill {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .debug-stat-lbl {
+      color: var(--text-muted);
+      font-weight: 600;
+    }
+    .debug-stat-val {
+      font-family: monospace;
+      font-weight: 700;
+      color: var(--text-primary);
+    }
+    .debug-panel-logs {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px 16px;
+      background: rgba(5, 7, 12, 0.8);
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .log-row {
+      line-height: 1.4;
+      word-break: break-all;
+    }
+    .log-row-time {
+      color: var(--text-muted);
+      margin-right: 8px;
+      user-select: none;
+    }
+    .log-row.info { color: #93c5fd; }
+    .log-row.success { color: #34d399; }
+    .log-row.warning { color: #fcd34d; }
+    .log-row.error { color: #fca5a5; }
+
+    /* Custom Leaflet Marker Design */
+    .custom-marker-wrapper {
+      position: relative;
+      width: 30px;
+      height: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .marker-ping-ring {
+      position: absolute;
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      background: var(--accent-red);
+      opacity: 0.45;
+      animation: marker-ping 1.4s cubic-bezier(0, 0, 0.2, 1) infinite;
+      pointer-events: none;
+    }
+    @keyframes marker-ping {
+      0% { transform: scale(0.4); opacity: 0.9; }
+      100% { transform: scale(2.0); opacity: 0; }
+    }
+    .custom-marker-wrapper svg {
+      filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.6)) drop-shadow(0 0 6px var(--accent-red-glow));
+      transition: transform 0.25s ease;
+    }
+    .custom-leaflet-marker.active-marker .custom-marker-wrapper svg {
+      transform: scale(1.22);
+      filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.7)) drop-shadow(0 0 12px rgba(239, 68, 68, 0.95));
+    }
+    .custom-leaflet-marker.active-marker .marker-ping-ring {
+      background: #ff3b3b;
+      animation-duration: 0.9s;
+    }
+
+    /* Popups inside Map style overlays */
+    .map-popup-card {
+      padding: 4px;
+    }
+    .popup-title {
+      color: var(--accent-red);
+      font-size: 0.85rem;
+      font-weight: 800;
+      margin-bottom: 6px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      padding-bottom: 4px;
+      letter-spacing: 0.5px;
+    }
+    .popup-row {
+      margin-bottom: 4px;
+      font-size: 0.78rem;
+    }
+    .popup-row strong {
+      color: var(--text-secondary);
+    }
+    .popup-link-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--accent-red);
+      color: #ffffff !important;
+      padding: 4px 10px;
+      border-radius: 4px;
+      text-decoration: none;
+      font-weight: 700;
+      font-size: 0.72rem;
+      margin-top: 6px;
+      border: none;
+      cursor: pointer;
+      box-shadow: 0 2px 6px var(--accent-red-glow);
+      transition: var(--transition);
+    }
+    .popup-link-btn:hover {
+      background: #ff5050;
+      box-shadow: 0 4px 10px rgba(239, 68, 68, 0.4);
+    }
+
+    /* Dynamic Toast Notification Drawer */
+    #toast-container {
+      position: fixed;
+      top: 24px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 10000;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      pointer-events: none;
+    }
+    .toast {
+      background: rgba(15, 23, 42, 0.95);
+      border: 1px solid var(--panel-border);
+      color: var(--text-primary);
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      box-shadow: 0 4px 15px rgba(0, 0, 0, 0.45);
+      transform: translateY(-20px);
+      opacity: 0;
+      transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease;
+      backdrop-filter: blur(8px);
+    }
+    .toast.show {
+      transform: translateY(0);
+      opacity: 1;
+    }
+    .toast.success { border-left: 3px solid var(--accent-green); }
+    .toast.error { border-left: 3px solid var(--accent-red); }
+    .toast.warning { border-left: 3px solid var(--accent-yellow); }
+
+    /* Loading Overlay Screen */
+    .loading-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: var(--bg-color);
+      z-index: 9999;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      transition: opacity 0.4s ease, visibility 0.4s ease;
+    }
+    .loading-overlay.hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+    .spinner-box {
+      position: relative;
+      width: 80px;
+      height: 80px;
+      margin-bottom: 24px;
+    }
+    .double-ring-spinner {
+      width: 80px;
+      height: 80px;
+      border: 4px solid rgba(239, 68, 68, 0.08);
+      border-top: 4px solid var(--accent-red);
+      border-radius: 50%;
+      animation: double-ring-spin 1.1s linear infinite;
+    }
+    .pulse-core {
+      position: absolute;
+      top: 15px;
+      left: 15px;
+      width: 50px;
+      height: 50px;
+      background: var(--accent-blue);
+      border-radius: 50%;
+      animation: core-pulsate 1.5s ease-in-out infinite;
+      opacity: 0.65;
+    }
+    @keyframes double-ring-spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    @keyframes core-pulsate {
+      0%, 100% { transform: scale(0.85); opacity: 0.45; }
+      50% { transform: scale(1.05); opacity: 0.8; }
+    }
+    .loading-overlay h2 {
+      font-size: 1.15rem;
+      font-weight: 700;
+      margin-bottom: 6px;
+      letter-spacing: 0.5px;
+      color: var(--text-primary);
+    }
+    .loading-overlay p {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+    
+    /* Error diagnostics overlay layout */
+    .error-card-display {
+      margin-top: 24px;
+      background: rgba(30, 10, 10, 0.4);
+      border: 1px solid var(--accent-red);
+      border-radius: 8px;
+      padding: 16px;
+      max-width: 500px;
+      width: 90%;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+    }
+    .error-card-title {
+      color: var(--accent-red);
+      font-weight: 700;
+      font-size: 0.9rem;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .error-card-desc {
+      font-size: 0.8rem;
+      color: var(--text-secondary);
+      margin-bottom: 12px;
+      line-height: 1.45;
+    }
+    .error-card-code {
+      background: rgba(0, 0, 0, 0.4);
+      color: #fca5a5;
+      font-family: monospace;
+      padding: 8px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      border: 1px solid rgba(239, 68, 68, 0.15);
+      margin-bottom: 12px;
+      word-break: break-all;
+    }
+    .error-card-steps {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+    .error-card-steps ul {
+      margin-left: 16px;
+      margin-top: 4px;
+    }
+    .error-card-steps li {
+      margin-bottom: 3px;
+    }
+
+    /* Reponsiveness media queries */
+    @media (max-width: 1250px) {
+      .main-layout {
+        grid-template-columns: 320px 1fr;
+        grid-template-rows: 1fr;
+      }
+      .details-panel {
+        display: none !important; /* Hide details on mid-screens, select is managed on popup */
+      }
+      .metrics-grid {
+        grid-template-columns: repeat(5, 1fr);
+      }
+    }
+    @media (max-width: 950px) {
+      body {
+        overflow-y: auto;
+        height: auto;
+      }
+      .dashboard-container {
+        grid-template-rows: auto auto auto auto;
+        height: auto;
+      }
+      .main-layout {
+        grid-template-columns: 1fr;
+        grid-template-rows: 400px 450px;
+        height: auto;
+        min-height: auto;
+      }
+      .metrics-grid {
+        grid-template-columns: repeat(2, 1fr);
+      }
+      #metric-coords {
+        grid-column: span 2;
+      }
+      .debug-console-panel {
+        height: 250px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Loading & Error Connection Overlay Screen -->
+  <div id="loading-overlay" class="loading-overlay">
+    <div class="spinner-box">
+      <div class="double-ring-spinner"></div>
+      <div class="pulse-core"></div>
+    </div>
+    <h2 id="loading-status-text">Connecting to emergency database...</h2>
+    <p id="loading-sub-text">Establishing real-time connection with Firestore</p>
+    <div id="loading-error-block" style="display: none;">
+      <!-- Details are dynamically loaded here on connection errors -->
+    </div>
+  </div>
+
+  <!-- Toast Notification System -->
+  <div id="toast-container"></div>
+
+  <!-- Central Dashboard Panel Wrapper -->
+  <div class="dashboard-container">
+    
+    <!-- Top Header Panel -->
+    <header class="dashboard-header">
+      <div class="header-left">
+        <div class="pulse-glow-dot"></div>
+        <div class="header-titles">
+          <h1>EMERGENCY LOCATION MONITOR</h1>
+          <p>Realtime Telemetry & Response Console</p>
+        </div>
+      </div>
+      
+      <div class="header-status-pills">
+        <!-- Firebase SDK client Status -->
+        <div class="status-pill" id="fb-status-pill" data-status="connecting">
+          <span class="indicator-dot"></span>
+          <span id="fb-status-lbl">Firebase: Connecting...</span>
+        </div>
+        
+        <!-- Firestore Snapshot Stream Status -->
+        <div class="status-pill" id="fs-status-pill" data-status="connecting">
+          <span class="indicator-dot"></span>
+          <span id="fs-status-lbl">Listener: Inactive</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Metrics Bar Segment -->
+    <section class="metrics-grid">
+      <!-- Metric 1: Total -->
+      <div class="metric-card total" id="metric-total-card">
+        <div class="metric-card-header">
+          <span class="metric-card-title">Total Emergencies</span>
+          <i class="fas fa-satellite"></i>
+        </div>
+        <div class="metric-card-value" id="val-total">0</div>
+        <div class="metric-card-footer">All records received</div>
+      </div>
+
+      <!-- Metric 2: Valid -->
+      <div class="metric-card valid" id="metric-valid-card">
+        <div class="metric-card-header">
+          <span class="metric-card-title">Valid Locations</span>
+          <i class="fas fa-shield-halved"></i>
+        </div>
+        <div class="metric-card-value" id="val-valid">0</div>
+        <div class="metric-card-footer">Successfully mapped</div>
+      </div>
+
+      <!-- Metric 3: Invalid -->
+      <div class="metric-card invalid" id="metric-invalid-card">
+        <div class="metric-card-header">
+          <span class="metric-card-title">Invalid Documents</span>
+          <i class="fas fa-triangle-exclamation"></i>
+        </div>
+        <div class="metric-card-value" id="val-invalid">0</div>
+        <div class="metric-card-footer">Missing latitude/longitude</div>
+      </div>
+
+      <!-- Metric 4: Latest Time -->
+      <div class="metric-card time" id="metric-time-card">
+        <div class="metric-card-header">
+          <span class="metric-card-title">Latest Signal</span>
+          <i class="fas fa-clock"></i>
+        </div>
+        <div class="metric-card-value" id="val-time">-</div>
+        <div class="metric-card-footer" id="val-time-sub">Waiting for updates...</div>
+      </div>
+
+      <!-- Metric 5: Coordinates -->
+      <div class="metric-card coords" id="metric-coords-card">
+        <div class="metric-card-header">
+          <span class="metric-card-title">Latest Coordinates</span>
+          <i class="fas fa-location-crosshairs"></i>
+        </div>
+        <div class="metric-card-value" id="val-coords" style="font-size: 1.05rem; line-height: 1.35; padding-top: 4px;">-</div>
+        <div class="metric-card-footer" id="val-coords-sub">No coordinates mapped</div>
+      </div>
+    </section>
+
+    <!-- Main Layout Content Section -->
+    <div class="main-layout">
+      
+      <!-- Left Panel: Search & Location Alert Cards -->
+      <aside class="left-panel flex-panel">
+        <div class="panel-header">
+          <h2><i class="fas fa-fire-flame-simple"></i> Active Alert Feed</h2>
+          <div class="badge" id="list-badge-val">0 / 0 Alerts</div>
+        </div>
+        
+        <!-- Search and Filter bar container -->
+        <div class="search-filter-container">
+          <div class="search-input-box">
+            <i class="fas fa-search"></i>
+            <input type="text" id="phone-search-input" placeholder="Search by phone number..." />
+            <button id="search-clear-btn" class="search-clear-btn" style="display:none;"><i class="fas fa-times"></i></button>
+          </div>
+          
+          <div class="filter-pills">
+            <button class="filter-btn active" data-filter="all">All Logs</button>
+            <button class="filter-btn" data-filter="valid">Valid Pins</button>
+            <button class="filter-btn" data-filter="invalid">Invalid</button>
+            <button class="filter-btn" data-filter="latest">Latest</button>
+          </div>
+        </div>
+
+        <!-- Scrollable Alerts list Container -->
+        <div class="location-list" id="alerts-list-scroll">
+          <div class="location-list-placeholder">
+            <i class="fas fa-rotate spinner-pulse"></i>
+            <p>Initializing Firestore listener...</p>
+          </div>
+        </div>
+      </aside>
+
+      <!-- Center Panel: Interactive Leaflet Map -->
+      <main class="map-panel flex-panel">
+        <div class="panel-header">
+          <h2><i class="fas fa-map-location-dot"></i> Live Geospatial Matrix</h2>
+          <div class="map-header-actions">
+            <button id="refresh-view-btn" class="map-btn" title="Reconnect stream"><i class="fas fa-arrows-rotate"></i> Refresh Stream</button>
+            <button id="center-map-btn" class="map-btn" title="Center map boundaries"><i class="fas fa-compress"></i> Fit Markers</button>
+            <button id="clear-selection-btn" class="map-btn" title="Deselect location"><i class="fas fa-ban"></i> Deselect</button>
+            <button id="copy-latest-coords-btn" class="map-btn" title="Copy latest coordinate pair"><i class="fas fa-copy"></i> Copy Latest</button>
+          </div>
+        </div>
+        
+        <!-- Leaflet Map Canvas element -->
+        <div id="map" class="map-container"></div>
+        
+        <!-- Floating state overlay -->
+        <div id="map-overlay-banner" class="map-status-banner hidden">
+          <i class="fas fa-circle-exclamation"></i>
+          <span id="map-overlay-banner-txt">Connected successfully. No emergency locations found.</span>
+        </div>
+      </main>
+
+      <!-- Right Panel: Telemetry & Inspector -->
+      <aside class="details-panel flex-panel">
+        <div class="panel-header">
+          <h2><i class="fas fa-magnifying-glass-location"></i> Telemetry Inspector</h2>
+        </div>
+        
+        <div class="details-scrollable">
+          <!-- Empty Selected State -->
+          <div id="inspector-empty" class="details-empty-state">
+            <div class="radar-animation-box">
+              <div class="radar-spinning-beam"></div>
+            </div>
+            <h3>Waiting for Selection</h3>
+            <p>Select a location alert from the list panel or click a map marker to fetch detailed telemetry variables.</p>
+          </div>
+
+          <!-- Active details state -->
+          <div id="inspector-active" class="details-active-state hidden">
+            <div class="details-active-header">
+              <div class="details-phone" id="insp-phone">+91 00000 00000</div>
+              <span class="badge valid" id="insp-badge">Valid</span>
+            </div>
+
+            <div class="telemetry-grid">
+              <!-- User ID -->
+              <div class="telemetry-row">
+                <span class="telemetry-label"><i class="fas fa-user-gear"></i> User ID</span>
+                <div class="telemetry-value-box">
+                  <span class="telemetry-value mono" id="insp-uid">-</span>
+                  <button class="telemetry-copy-btn" id="copy-uid-btn" title="Copy User ID"><i class="fas fa-copy"></i></button>
+                </div>
+              </div>
+
+              <!-- Document ID -->
+              <div class="telemetry-row">
+                <span class="telemetry-label"><i class="fas fa-database"></i> Firestore Document ID</span>
+                <div class="telemetry-value-box">
+                  <span class="telemetry-value mono" id="insp-docid">-</span>
+                  <button class="telemetry-copy-btn" id="copy-docid-btn" title="Copy Firestore Doc ID"><i class="fas fa-copy"></i></button>
+                </div>
+              </div>
+
+              <!-- Latitude -->
+              <div class="telemetry-row">
+                <span class="telemetry-label"><i class="fas fa-compass"></i> Latitude</span>
+                <div class="telemetry-value-box">
+                  <span class="telemetry-value" id="insp-lat">-</span>
+                </div>
+              </div>
+
+              <!-- Longitude -->
+              <div class="telemetry-row">
+                <span class="telemetry-label"><i class="fas fa-compass"></i> Longitude</span>
+                <div class="telemetry-value-box">
+                  <span class="telemetry-value" id="insp-lng">-</span>
+                </div>
+              </div>
+
+              <!-- Accuracy -->
+              <div class="telemetry-row">
+                <span class="telemetry-label"><i class="fas fa-bullseye"></i> Accuracy Radius</span>
+                <div class="telemetry-value-box">
+                  <span class="telemetry-value" id="insp-accuracy">-</span>
+                </div>
+              </div>
+
+              <!-- Timestamp -->
+              <div class="telemetry-row">
+                <span class="telemetry-label"><i class="fas fa-calendar-days"></i> Timestamp</span>
+                <div class="telemetry-value-box">
+                  <span class="telemetry-value" id="insp-time">-</span>
+                </div>
+              </div>
+
+              <!-- Elapsed Time -->
+              <div class="telemetry-row">
+                <span class="telemetry-label"><i class="fas fa-hourglass-half"></i> Elapsed Time</span>
+                <div class="telemetry-value-box">
+                  <span class="telemetry-value" id="insp-elapsed" style="color:var(--accent-blue);">-</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- Detail inspector action links -->
+            <div class="details-action-buttons">
+              <a href="#" target="_blank" id="insp-google-maps-btn" class="action-btn-link btn-maps">
+                <i class="fab fa-google"></i> Open in Google Maps
+              </a>
+              <button id="insp-copy-coords-btn" class="action-btn-link btn-copy">
+                <i class="fas fa-map-location"></i> Copy Coordinates
+              </button>
+              <button id="insp-center-map-btn" class="action-btn-link btn-center">
+                <i class="fas fa-crosshairs"></i> Center Map Here
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </aside>
+
+    </div>
+
+    <!-- Bottom Debug Engine Status Log Console -->
+    <footer class="debug-console-panel flex-panel" id="debug-footer">
+      <div class="panel-header">
+        <div class="debug-console-title-wrap">
+          <i class="fas fa-terminal debug-icon-spin"></i>
+          <h2>Telemetry Engine Event Console</h2>
+        </div>
+        <div class="debug-console-actions">
+          <button id="debug-clear-btn" class="debug-btn-action"><i class="fas fa-trash-can"></i> Clear Logs</button>
+          <button id="debug-toggle-btn" class="debug-btn-action"><i class="fas fa-chevron-down"></i> Minimize</button>
+        </div>
+      </div>
+      
+      <div class="debug-panel-stats-bar">
+        <div class="debug-stat-pill">
+          <span class="debug-stat-lbl">Firebase Initialization:</span>
+          <span class="debug-stat-val" id="dbg-stat-fb">Uninitialized</span>
+        </div>
+        <div class="debug-stat-pill">
+          <span class="debug-stat-lbl">Firestore Stream:</span>
+          <span class="debug-stat-val" id="dbg-stat-fs">Inactive</span>
+        </div>
+        <div class="debug-stat-pill">
+          <span class="debug-stat-lbl">Documents Loaded:</span>
+          <span class="debug-stat-val" id="dbg-stat-rx">0</span>
+        </div>
+        <div class="debug-stat-pill">
+          <span class="debug-stat-lbl">Last Heartbeat:</span>
+          <span class="debug-stat-val" id="dbg-stat-sync">-</span>
+        </div>
+      </div>
+
+      <!-- Realtime console logging output div -->
+      <div class="debug-panel-logs" id="console-logs-box">
+        <!-- Log rows are injected here -->
+      </div>
+    </footer>
+
+  </div>
+
+  <!-- Leaflet Javascript Library CDN -->
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+  <!-- Realtime Telemetry Module containing Firebase Connection and Dashboard Logic -->
+  <script type="module">
+    // -------------------------------------------------------------------------
+    // LOCAL SERVER RUNNING INSTRUCTIONS:
+    // This dashboard is compiled using Firebase ES6 Module SDK, which requires HTTP/HTTPS scope.
+    // Opening it directly via the filesystem (file:///C:/...) will trigger CORS policy errors.
+    // 
+    // CORRECT METHOD:
+    // 1. Open the directory containing this file using VS Code.
+    // 2. Click the "Go Live" button on the bottom status bar (requires "Live Server" extension).
+    //    Or run a local HTTP server in terminal: e.g. `npx http-server` or `python -m http.server 5500`
+    // 3. Access in browser at: http://localhost:5500/index.html or http://127.0.0.1:5500/index.html
+    // -------------------------------------------------------------------------
+
+    // --- FIREBASE CONFIGURATION CONFIG ---
+    // Please paste your real Firebase project configuration variables in this block:
+    const firebaseConfig = {
+      apiKey: "AIzaSyAO0BsO9oBa9EYjh-aOlP5Pa8qHNal-DpI",
+      authDomain: "emergency-response-11a1c.firebaseapp.com",
+      projectId: "emergency-response-11a1c",
+      storageBucket: "emergency-response-11a1c.firebasestorage.app",
+      messagingSenderId: "345734330880",
+      appId: "1:345734330880:web:f4f3c47ea5a5cde88476e5",
+      measurementId: "G-JDFCR543P9"
+    };
+
+    // Firebase v12 ESM imports
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-app.js";
+    import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-analytics.js";
+    import {
+      getFirestore,
+      collection,
+      query,
+      orderBy,
+      onSnapshot
+    } from "https://www.gstatic.com/firebasejs/12.14.0/firebase-firestore.js";
+
+    // --- GLOBAL TELEMETRY ENGINE STATE variables ---
+    let allLocations = [];          // Master storage array of parsed document elements
+    let map = null;                 // Leaflet map instance
+    let markersLayerGroup = null;   // Leaflet layer container for active pins
+    const markerMap = new Map();    // Map matching document IDs to Leaflet marker instances
+    let selectedLocationId = null;  // ID of currently highlighted document alert
+    let currentFilter = "all";      // Active filter pill: "all" / "valid" / "invalid" / "latest"
+    let searchQuery = "";           // Text query matching telephone fields
+    let unsubscribeFirestore = null;// Holds the active stream snapshot function
+
+    // --- TELEMETRY ENGINE LOGGER (Writes to both screen and system console) ---
+    function logEngineEvent(message, type = "info") {
+      const logsBox = document.getElementById("console-logs-box");
+      if (!logsBox) return;
+
+      const row = document.createElement("div");
+      row.className = `log-row ${type}`;
+
+      const timeSpan = document.createElement("span");
+      timeSpan.className = "log-row-time";
+      timeSpan.textContent = `[${new Date().toLocaleTimeString()}]`;
+
+      const textSpan = document.createElement("span");
+      textSpan.textContent = message;
+
+      row.appendChild(timeSpan);
+      row.appendChild(textSpan);
+      logsBox.appendChild(row);
+
+      // Keep console logs scroll to bottom
+      logsBox.scrollTop = logsBox.scrollHeight;
+
+      // Limit buffer to 100 entries
+      while (logsBox.childNodes.length > 100) {
+        logsBox.removeChild(logsBox.firstChild);
+      }
+
+      // Output directly to browser logs as required
+      if (type === "error") {
+        console.error(`[Engine] ${message}`);
+      } else if (type === "warning") {
+        console.warn(`[Engine] ${message}`);
+      } else {
+        console.log(`[Engine] ${message}`);
+      }
+    }
+
+    // --- REALTIME TOAST ALERTS SYSTEM ---
+    function triggerToast(message, type = "success") {
+      const container = document.getElementById("toast-container");
+      if (!container) return;
+
+      const toast = document.createElement("div");
+      toast.className = `toast ${type}`;
+
+      let icon = '<i class="fas fa-circle-check"></i>';
+      if (type === "error") icon = '<i class="fas fa-triangle-exclamation"></i>';
+      if (type === "warning") icon = '<i class="fas fa-circle-info"></i>';
+
+      toast.innerHTML = `${icon} <span>${message}</span>`;
+      container.appendChild(toast);
+
+      setTimeout(() => toast.classList.add("show"), 10);
+      
+      setTimeout(() => {
+        toast.classList.remove("show");
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    // Copy helper
+    window.copyText = function(elementId, labelName) {
+      const text = document.getElementById(elementId).textContent;
+      if (text === "-" || text === "N/A" || !text) return;
+      
+      navigator.clipboard.writeText(text).then(() => {
+        triggerToast(`${labelName} copied to clipboard!`, "success");
+        logEngineEvent(`Copied ${labelName}: ${text}`, "success");
+      }).catch(err => {
+        triggerToast(`Copy failed`, "error");
+      });
+    };
+
+    // --- LEAFLET MAP & TILE MATRIX INIT ---
+    function initializeLeafletMap() {
+      logEngineEvent("Initializing Leaflet geospatial matrix...", "info");
+      
+      // Initialize map container - default center on Hyderabad as fallback
+      const hyderabadCoords = [17.385044, 78.486671];
+      map = L.map('map', {
+        zoomControl: true,
+        attributionControl: true
+      }).setView(hyderabadCoords, 12);
+
+      // We utilize CartoDB Dark Matter tiles for a premium and stunning telemetry appearance.
+      // This complies with no Google Maps API keys and is fully open source.
+      const darkTiles = L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+        subdomains: 'abcd',
+        maxZoom: 20
+      }).addTo(map);
+
+      // Create a layer group to organize active marker pins
+      markersLayerGroup = L.layerGroup().addTo(map);
+
+      logEngineEvent("Geospatial Leaflet matrix loaded successfully ( Hyderabad Default )", "success");
+    }
+
+    // --- CUSTOM VECTOR RED PIN MARKER ICON ---
+    // Customized SVG divIcon prevents pathing errors associated with static image CDNs.
+    // Includes an active scale animation and animated ping pulse behind the marker.
+    const customRedMarkerIcon = L.divIcon({
+      html: `
+        <div class="custom-marker-wrapper">
+          <div class="marker-ping-ring"></div>
+          <svg class="marker-pin-svg" viewBox="0 0 24 24" width="30" height="30">
+            <path fill="#EF4444" d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5s1.12-2.5 2.5-2.5 2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/>
+          </svg>
+        </div>
+      `,
+      className: 'custom-leaflet-marker',
+      iconSize: [30, 42],
+      iconAnchor: [15, 36],
+      popupAnchor: [0, -32]
+    });
+
+    // --- DOCUMENT VALIDATION ENGINE ---
+    // Parses and checks document variables. Supports fallback variables.
+    function validateCoordinates(data) {
+      let latVal = undefined;
+      let lngVal = undefined;
+
+      // Primary fields check
+      if (data.latitude !== undefined && data.latitude !== null && data.latitude !== "") {
+        latVal = data.latitude;
+      } else if (data.lat !== undefined && data.lat !== null && data.lat !== "") {
+        // Alternative fallback variable check
+        latVal = data.lat;
+      }
+
+      if (data.longitude !== undefined && data.longitude !== null && data.longitude !== "") {
+        lngVal = data.longitude;
+      } else if (data.lng !== undefined && data.lng !== null && data.lng !== "") {
+        // Alternative fallback variable check
+        lngVal = data.lng;
+      }
+
+      if (latVal === undefined || lngVal === undefined) {
+        return null; // Missing lat or lng fields entirely
+      }
+
+      const parsedLat = Number(latVal);
+      const parsedLng = Number(lngVal);
+
+      // Validate numeric properties
+      if (isNaN(parsedLat) || isNaN(parsedLng) || !isFinite(parsedLat) || !isFinite(parsedLng)) {
+        return null;
+      }
+
+      // Valid boundary ranges check
+      if (parsedLat < -90 || parsedLat > 90 || parsedLng < -180 || parsedLng > 180) {
+        return null;
+      }
+
+      return { lat: parsedLat, lng: parsedLng };
+    }
+
+    // --- DOCUMENT TIMESTAMP FORMAT CONVERTOR ---
+    function parseDocumentTimestamp(ts) {
+      if (!ts) return null;
+      
+      // Firestore Timestamp checking (.toDate() method exists)
+      if (typeof ts.toDate === "function") {
+        return ts.toDate();
+      }
+      
+      // Checking Timestamp representation structure (seconds variable)
+      if (ts.seconds !== undefined) {
+        return new Date(ts.seconds * 1000);
+      }
+      
+      // String or Date parsing fallback
+      const dateVal = new Date(ts);
+      if (!isNaN(dateVal.getTime())) {
+        return dateVal;
+      }
+      
+      return null;
+    }
+
+    function getFormattedDateString(date) {
+      if (!date) return "N/A";
+      return date.toLocaleString(undefined, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit'
+      });
+    }
+
+    function getElapsedTimeLabel(date) {
+      if (!date) return "N/A";
+      const diffMs = new Date() - date;
+      const seconds = Math.floor(diffMs / 1000);
+      const minutes = Math.floor(seconds / 60);
+      const hours = Math.floor(minutes / 60);
+      const days = Math.floor(hours / 24);
+
+      if (seconds < 5) return "Just now";
+      if (seconds < 60) return `${seconds}s ago`;
+      if (minutes < 60) return `${minutes}m ago`;
+      if (hours < 24) return `${hours}h ago`;
+      return `${days}d ago`;
+    }
+
+    // --- STATUS LABELS COMPLIANCE AND RENDERING FUNCTIONS ---
+    function updateSystemConnectivityStatus(pillId, statusValue, textMessage) {
+      const pill = document.getElementById(pillId);
+      const lbl = document.getElementById(pillId === "fb-status-pill" ? "fb-status-lbl" : "fs-status-lbl");
+      
+      if (pill) pill.setAttribute("data-status", statusValue);
+      if (lbl) lbl.textContent = textMessage;
+
+      // Mirror state changes in internal console stats
+      if (pillId === "fb-status-pill") {
+        const dbgStat = document.getElementById("dbg-stat-fb");
+        if (dbgStat) {
+          dbgStat.textContent = statusValue === "connected" ? "Active" : statusValue === "failed" ? "Failed" : "Connecting...";
+          dbgStat.style.color = statusValue === "connected" ? "var(--accent-green)" : "var(--accent-red)";
+        }
+      } else {
+        const dbgStat = document.getElementById("dbg-stat-fs");
+        if (dbgStat) {
+          dbgStat.textContent = statusValue === "active" ? "Active Stream" : statusValue === "error" ? "Failure" : "Connecting...";
+          dbgStat.style.color = statusValue === "active" ? "var(--accent-green)" : "var(--accent-red)";
+        }
+      }
+    }
+
+    // --- INTERACTIVE SYSTEM CONTROLS ---
+    function centerMapOnBounds() {
+      const validAlerts = allLocations.filter(loc => loc.isValid);
+      if (validAlerts.length > 0) {
+        const bounds = validAlerts.map(loc => [loc.latitude, loc.longitude]);
+        map.fitBounds(bounds, { padding: [50, 50], maxZoom: 16 });
+        logEngineEvent(`Map boundary viewport adjusted to fit ${bounds.length} locations.`, "info");
+        triggerToast("Centered map on active alerts", "success");
+      } else {
+        // Fallback zoom to Hyderabad center coordinates
+        map.setView([17.385044, 78.486671], 12);
+        logEngineEvent("No valid alert markers found. Map centered on Hyderabad default.", "warning");
+        triggerToast("No markers to center on. Centering on Hyderabad.", "warning");
+      }
+    }
+
+    function clearSelectionState() {
+      selectedLocationId = null;
+      
+      // Clear visual list highlights
+      document.querySelectorAll(".alert-card").forEach(card => card.classList.remove("selected"));
+      
+      // Remove marker active class shapes on map
+      document.querySelectorAll(".custom-leaflet-marker").forEach(el => el.classList.remove("active-marker"));
+
+      // Close open map popups
+      map.closePopup();
+
+      // Clear details panel visual inspector states
+      document.getElementById("inspector-active").classList.add("hidden");
+      document.getElementById("inspector-empty").classList.remove("hidden");
+
+      logEngineEvent("Telemetry selection cleared.", "info");
+      triggerToast("Inspector reset", "warning");
+    }
+
+    function copyLatestCoordinatesPair() {
+      const sortedValidAlerts = allLocations
+        .filter(loc => loc.isValid)
+        .sort((a, b) => {
+          const timeA = parseDocumentTimestamp(a.timestamp);
+          const timeB = parseDocumentTimestamp(b.timestamp);
+          if (!timeA) return 1;
+          if (!timeB) return -1;
+          return timeB - timeA;
+        });
+
+      if (sortedValidAlerts.length > 0) {
+        const latest = sortedValidAlerts[0];
+        const coordsText = `${latest.latitude}, ${latest.longitude}`;
+        navigator.clipboard.writeText(coordsText).then(() => {
+          logEngineEvent(`Copied latest coordinates: ${coordsText}`, "success");
+          triggerToast(`Copied latest coords: ${coordsText}`, "success");
+        }).catch(err => {
+          triggerToast("Copy failed", "error");
+        });
+      } else {
+        triggerToast("No coordinates found to copy", "error");
+        logEngineEvent("Copy latest coordinates failed. No valid alerts mapped.", "warning");
+      }
+    }
+
+    // --- RE-ESTABLISH SNAPSHOT STREAM CONTEXT ---
+    function reconnectFirestoreStream() {
+      logEngineEvent("Restarting database subscription context...", "info");
+      triggerToast("Refreshing connection stream...", "warning");
+      
+      if (unsubscribeFirestore) {
+        try {
+          unsubscribeFirestore();
+        } catch (err) {
+          logEngineEvent(`Error killing listener: ${err.message}`, "warning");
+        }
+      }
+
+      updateSystemConnectivityStatus("fs-status-pill", "connecting", "Listener: Connecting...");
+      startFirestoreRealtimeListener();
+    }
+
+    // --- TELEMETRY INSPECTOR UPDATE ---
+    window.selectLocation = function(id, focusOnMarker = true) {
+      selectedLocationId = id;
+      
+      // Update visual selection highlights on the Alert list
+      document.querySelectorAll(".alert-card").forEach(card => {
+        if (card.getAttribute("data-id") === id) {
+          card.classList.add("selected");
+          // Scroll alert card into view inside left panel scroll element
+          card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        } else {
+          card.classList.remove("selected");
+        }
+      });
+
+      // Highlight corresponding map marker and open popup bubble
+      const marker = markerMap.get(id);
+      
+      // Clear active marker class styling from all elements
+      document.querySelectorAll(".custom-leaflet-marker").forEach(el => el.classList.remove("active-marker"));
+
+      if (marker) {
+        const markerEl = marker.getElement();
+        if (markerEl) {
+          markerEl.classList.add("active-marker");
+        }
+        marker.openPopup();
+        
+        if (focusOnMarker) {
+          map.setView(marker.getLatLng(), 16);
+          logEngineEvent(`Map viewport panned to location ID: ${id}`, "info");
+        }
+      } else {
+        logEngineEvent(`Selected alert has no valid coordinates. Map centering bypassed.`, "warning");
+      }
+
+      // Render details in right inspector
+      const targetLoc = allLocations.find(l => l.id === id);
+      if (!targetLoc) return;
+
+      const isVal = targetLoc.isValid;
+      
+      // Setup text nodes
+      document.getElementById("insp-phone").textContent = targetLoc.phone || "Unknown Phone";
+      
+      const badge = document.getElementById("insp-badge");
+      badge.textContent = isVal ? "Valid" : "Invalid";
+      badge.className = `badge ${isVal ? 'valid' : 'invalid'}`;
+
+      document.getElementById("insp-uid").textContent = targetLoc.user_id || "N/A";
+      document.getElementById("insp-docid").textContent = targetLoc.id;
+      
+      const latEl = document.getElementById("insp-lat");
+      const lngEl = document.getElementById("insp-lng");
+      const accuracyEl = document.getElementById("insp-accuracy");
+      
+      if (isVal) {
+        latEl.textContent = targetLoc.latitude;
+        latEl.classList.remove("invalid-txt");
+        lngEl.textContent = targetLoc.longitude;
+        lngEl.classList.remove("invalid-txt");
+        accuracyEl.textContent = targetLoc.accuracy !== undefined && targetLoc.accuracy !== null ? `${targetLoc.accuracy} meters` : "N/A";
+      } else {
+        latEl.textContent = "Missing / Invalid";
+        latEl.classList.add("invalid-txt");
+        lngEl.textContent = "Missing / Invalid";
+        lngEl.classList.add("invalid-txt");
+        accuracyEl.textContent = "N/A";
+      }
+
+      const timestamp = parseDocumentTimestamp(targetLoc.timestamp);
+      document.getElementById("insp-time").textContent = getFormattedDateString(timestamp);
+      document.getElementById("insp-elapsed").textContent = getElapsedTimeLabel(timestamp);
+
+      // Handle inspector primary actions buttons state
+      const mapBtn = document.getElementById("insp-google-maps-btn");
+      const copyBtn = document.getElementById("insp-copy-coords-btn");
+      const centerBtn = document.getElementById("insp-center-map-btn");
+
+      if (isVal) {
+        mapBtn.href = `https://maps.google.com/?q=${targetLoc.latitude},${targetLoc.longitude}`;
+        mapBtn.classList.remove("disabled");
+        
+        copyBtn.onclick = function() {
+          const coordsStr = `${targetLoc.latitude}, ${targetLoc.longitude}`;
+          navigator.clipboard.writeText(coordsStr).then(() => {
+            triggerToast("Coordinates copied to clipboard!", "success");
+            logEngineEvent(`Copied coordinates: ${coordsStr}`, "success");
+          });
+        };
+        copyBtn.classList.remove("disabled");
+
+        centerBtn.onclick = function() {
+          map.setView([targetLoc.latitude, targetLoc.longitude], 16);
+          marker.openPopup();
+          logEngineEvent(`Centering viewport on selected marker coordinates`, "info");
+        };
+        centerBtn.classList.remove("disabled");
+      } else {
+        mapBtn.removeAttribute("href");
+        mapBtn.classList.add("disabled");
+        copyBtn.onclick = null;
+        copyBtn.classList.add("disabled");
+        centerBtn.onclick = null;
+        centerBtn.classList.add("disabled");
+      }
+
+      // Switch panels display
+      document.getElementById("inspector-empty").classList.add("hidden");
+      document.getElementById("inspector-active").classList.remove("hidden");
+      
+      logEngineEvent(`Telemetry loaded for record ID: ${id}`, "info");
+    };
+
+    // --- ALERT CONTAINER LIST RENDERING & PROCESSING ENGINE ---
+    function renderAlertsFeedAndMarkers() {
+      const listContainer = document.getElementById("alerts-list-scroll");
+      if (!listContainer) return;
+
+      // Filter and query list data
+      let renderingLocations = [...allLocations];
+      
+      // Perform manual timestamp ordering: newest first
+      // Place items without timestamp elements at the bottom
+      renderingLocations = renderingLocations.sort((a, b) => {
+        const timeA = parseDocumentTimestamp(a.timestamp);
+        const timeB = parseDocumentTimestamp(b.timestamp);
+        if (!timeA && !timeB) return 0;
+        if (!timeA) return 1;
+        if (!timeB) return -1;
+        return timeB - timeA;
+      });
+
+      // Apply search queries
+      if (searchQuery.trim() !== "") {
+        const q = searchQuery.toLowerCase().trim();
+        renderingLocations = renderingLocations.filter(loc => {
+          const phone = loc.phone ? String(loc.phone).toLowerCase() : "";
+          return phone.includes(q);
+        });
+      }
+
+      // Apply status filter pills
+      if (currentFilter === "valid") {
+        renderingLocations = renderingLocations.filter(loc => loc.isValid);
+      } else if (currentFilter === "invalid") {
+        renderingLocations = renderingLocations.filter(loc => !loc.isValid);
+      } else if (currentFilter === "latest") {
+        const validOnly = renderingLocations.filter(loc => loc.isValid);
+        renderingLocations = validOnly.length > 0 ? [validOnly[0]] : [];
+      }
+
+      // Update alert counter badge display
+      document.getElementById("list-badge-val").textContent = `${renderingLocations.length} / ${allLocations.length} Alerts`;
+
+      // Clear map markers and list cards before rendering
+      markersLayerGroup.clearLayers();
+      markerMap.clear();
+      listContainer.innerHTML = "";
+
+      // Floating status banner overlays reference
+      const mapOverlay = document.getElementById("map-overlay-banner");
+      const mapOverlayTxt = document.getElementById("map-overlay-banner-txt");
+
+      // Check for zero documents connectivity states
+      if (allLocations.length === 0) {
+        // "If Firebase connects but no documents exist, show: Connected successfully. No emergency locations found."
+        mapOverlayTxt.textContent = "Connected successfully. No emergency locations found.";
+        mapOverlay.className = "map-status-banner success-style";
+        
+        listContainer.innerHTML = `
+          <div class="location-list-placeholder">
+            <i class="fas fa-database"></i>
+            <p style="font-weight: 700;">Connected successfully.</p>
+            <p>No emergency locations found in Firestore.</p>
+          </div>
+        `;
+        return;
+      }
+
+      const totalValidCount = allLocations.filter(loc => loc.isValid).length;
+      if (totalValidCount === 0) {
+        // "If documents exist but coordinates are invalid, show: Documents found, but latitude/longitude missing."
+        mapOverlayTxt.textContent = "Documents found, but latitude/longitude missing.";
+        mapOverlay.className = "map-status-banner error-style";
+      } else {
+        // Hide floating banner overlay if valid elements exist
+        mapOverlay.className = "map-status-banner hidden";
+      }
+
+      if (renderingLocations.length === 0) {
+        listContainer.innerHTML = `
+          <div class="location-list-placeholder">
+            <i class="fas fa-filter"></i>
+            <p>No alerts match your current filter or query criteria.</p>
+          </div>
+        `;
+        return;
+      }
+
+      // Re-populate list and add map marker features
+      renderingLocations.forEach(loc => {
+        const timestamp = parseDocumentTimestamp(loc.timestamp);
+        
+        // Render item list card
+        const card = document.createElement("div");
+        card.className = `alert-card ${selectedLocationId === loc.id ? 'selected' : ''}`;
+        card.setAttribute("data-id", loc.id);
+        
+        card.innerHTML = `
+          <div class="alert-card-header">
+            <span class="alert-phone">${loc.phone || 'Unknown Phone'}</span>
+            <span class="badge ${loc.isValid ? 'valid' : 'invalid'}">${loc.isValid ? 'Valid' : 'Invalid'}</span>
+          </div>
+          <div class="alert-uid">UID: ${loc.user_id || 'N/A'}</div>
+          <div class="alert-coordinates">
+            <i class="fas fa-map-marker-alt"></i>
+            <span>${loc.isValid ? `${loc.latitude.toFixed(5)}, ${loc.longitude.toFixed(5)}` : 'Coordinates missing / invalid'}</span>
+          </div>
+          <div class="alert-footer">
+            <span class="alert-time"><i class="far fa-clock"></i> ${getElapsedTimeLabel(timestamp)}</span>
+            <span class="alert-accuracy">±${loc.accuracy !== undefined && loc.accuracy !== null ? loc.accuracy + 'm' : 'N/A'}</span>
+          </div>
+        `;
+
+        card.addEventListener("click", () => {
+          selectLocation(loc.id, true);
+        });
+
+        listContainer.appendChild(card);
+
+        // Map marker mapping
+        if (loc.isValid) {
+          const popupContent = `
+            <div class="map-popup-card">
+              <div class="popup-title"><i class="fas fa-circle-radiation animate-pulse"></i> EMERGENCY TELEMETRY</div>
+              <div class="popup-row"><strong>Phone:</strong> ${loc.phone || 'Unknown'}</div>
+              <div class="popup-row"><strong>Coords:</strong> ${loc.latitude.toFixed(6)}, ${loc.longitude.toFixed(6)}</div>
+              <div class="popup-row"><strong>Accuracy:</strong> ±${loc.accuracy !== undefined && loc.accuracy !== null ? loc.accuracy + 'm' : 'N/A'}</div>
+              <div class="popup-row"><strong>Timestamp:</strong> ${getFormattedDateString(timestamp)}</div>
+              <a href="https://maps.google.com/?q=${loc.latitude},${loc.longitude}" target="_blank" class="popup-link-btn">
+                <i class="fab fa-google"></i> Google Maps
+              </a>
+            </div>
+          `;
+
+          const marker = L.marker([loc.latitude, loc.longitude], { icon: customRedMarkerIcon })
+            .bindPopup(popupContent)
+            .addTo(markersLayerGroup);
+
+          // Connect marker click listener event
+          marker.on("click", () => {
+            selectLocation(loc.id, false); // highlight listing but prevent panning map loop
+          });
+
+          // Bind marker object to lookup mapping
+          markerMap.set(loc.id, marker);
+        }
+      });
+
+      // If selection exists, maintain high-light elements
+      if (selectedLocationId) {
+        const marker = markerMap.get(selectedLocationId);
+        if (marker) {
+          const markerEl = marker.getElement();
+          if (markerEl) markerEl.classList.add("active-marker");
+        }
+      }
+    }
+
+    // --- TELEMETRY METRIC VALUES DISPLAY ---
+    function refreshMetricsCounters(dataList, validCount, invalidCount) {
+      document.getElementById("val-total").textContent = dataList.length;
+      document.getElementById("val-valid").textContent = validCount;
+      document.getElementById("val-invalid").textContent = invalidCount;
+
+      // Extract valid element sorted by timestamp to update latest variables
+      const sortedValids = dataList
+        .filter(loc => loc.isValid)
+        .sort((a, b) => {
+          const tA = parseDocumentTimestamp(a.timestamp);
+          const tB = parseDocumentTimestamp(b.timestamp);
+          if (!tA) return 1;
+          if (!tB) return -1;
+          return tB - tA;
+        });
+
+      const timeVal = document.getElementById("val-time");
+      const timeSubVal = document.getElementById("val-time-sub");
+      const coordsVal = document.getElementById("val-coords");
+      const coordsSubVal = document.getElementById("val-coords-sub");
+
+      if (sortedValids.length > 0) {
+        const latest = sortedValids[0];
+        const latestTime = parseDocumentTimestamp(latest.timestamp);
+        
+        timeVal.textContent = getElapsedTimeLabel(latestTime);
+        timeSubVal.textContent = getFormattedDateString(latestTime);
+        
+        coordsVal.innerHTML = `${latest.latitude.toFixed(5)}<br>${latest.longitude.toFixed(5)}`;
+        coordsSubVal.textContent = `Phone: ${latest.phone || 'N/A'}`;
+      } else {
+        timeVal.textContent = "-";
+        timeSubVal.textContent = "No valid records mapped";
+        coordsVal.textContent = "-";
+        coordsSubVal.textContent = "N/A";
+      }
+    }
+
+    // --- MAIN FIRESTORE DATA STREAM CALLBACK HANDLER ---
+    function processIncomingFirestoreData(docsArray) {
+      const dataList = [];
+      let validCount = 0;
+      let invalidCount = 0;
+
+      docsArray.forEach(docDataObj => {
+        const data = docDataObj.data();
+        const id = docDataObj.id;
+
+        // "Also log everything to browser console: Location document:"
+        console.log("Location document:", data);
+
+        // Validate coords and read fallback variable values if required
+        const validatedCoords = validateCoordinates(data);
+        
+        if (validatedCoords) {
+          validCount++;
+          dataList.push({
+            id: id,
+            ...data,
+            latitude: validatedCoords.lat,
+            longitude: validatedCoords.lng,
+            isValid: true
+          });
+        } else {
+          invalidCount++;
+          dataList.push({
+            id: id,
+            ...data,
+            isValid: false
+          });
+          logEngineEvent(`Document ID ${id} coordinates validation failed. Fields: ${JSON.stringify(data)}`, "warning");
+        }
+      });
+
+      // Save documents to local memory buffer array
+      allLocations = dataList;
+
+      // Update internal statistics console items
+      document.getElementById("dbg-stat-rx").textContent = allLocations.length;
+      document.getElementById("dbg-stat-sync").textContent = new Date().toLocaleTimeString();
+
+      // Clear loading screen on successful live fetch stream arrival
+      const loadingOverlay = document.getElementById("loading-overlay");
+      if (loadingOverlay && !loadingOverlay.classList.contains("hidden")) {
+        loadingOverlay.classList.add("hidden");
+      }
+
+      // Re-calculate statistics cards
+      refreshMetricsCounters(allLocations, validCount, invalidCount);
+
+      // Render components UI elements
+      renderAlertsFeedAndMarkers();
+
+      // Auto-update inspector if active location has refreshed data values
+      if (selectedLocationId) {
+        if (allLocations.some(l => l.id === selectedLocationId)) {
+          selectLocation(selectedLocationId, false);
+        } else {
+          clearSelectionState(); // selected record was deleted from db
+        }
+      }
+    }
+
+    // --- FIRESTORE SNAPSHOT SUBSCRIPTION ---
+    function startFirestoreRealtimeListener() {
+      const dbgStatFs = document.getElementById("dbg-stat-fs");
+      if (dbgStatFs) dbgStatFs.textContent = "Connecting...";
+
+      try {
+        logEngineEvent("Subscribing to 'locations' collection stream...", "info");
+        // "onSnapshot(collection(db, "locations"), ...)"
+        const locationsColRef = collection(db, "locations");
+        
+        // "Listening to locations..." must log to console
+        console.log("Listening to locations...");
+
+        unsubscribeFirestore = onSnapshot(locationsColRef, (snapshot) => {
+          updateSystemConnectivityStatus("fs-status-pill", "active", "Listener: Live Stream Active");
+          logEngineEvent(`Firestore Snapshot received: ${snapshot.size} documents fetched.`, "success");
+          
+          // "Snapshot received:" must log to console
+          console.log("Snapshot received:", snapshot.size);
+
+          processIncomingFirestoreData(snapshot);
+        }, (error) => {
+          // "Firestore error: error" must log to console
+          console.error("Firestore error:", error);
+
+          let friendlyErrorMsg = error.message;
+          if (error.code === "permission-denied") {
+            friendlyErrorMsg = "Firestore permission denied. Check Firestore rules.";
+            // Required exactly: "Firestore permission denied. Check Firestore Rules."
+            triggerErrorOverlayDisplay("Firestore permission denied. Check Firestore Rules.", friendlyErrorMsg);
+          } else {
+            triggerErrorOverlayDisplay("Database stream connection failed", friendlyErrorMsg);
+          }
+          
+          updateSystemConnectivityStatus("fs-status-pill", "error", friendlyErrorMsg);
+          logEngineEvent(`Firestore subscription stream error: ${friendlyErrorMsg}`, "error");
+        });
+      } catch (err) {
+        console.error("Firestore startup error:", err);
+        updateSystemConnectivityStatus("fs-status-pill", "error", err.message);
+        logEngineEvent(`Failed to establish database listener context: ${err.message}`, "error");
+        triggerErrorOverlayDisplay("Listener Initialization Error", err.message);
+      }
+    }
+
+    // --- DIAGNOSTICS SCREEN OVERLAY INJECTOR ---
+    function triggerErrorOverlayDisplay(title, errorText) {
+      const statusText = document.getElementById("loading-status-text");
+      const subText = document.getElementById("loading-sub-text");
+      const errorBlock = document.getElementById("loading-error-block");
+      const loadingOverlay = document.getElementById("loading-overlay");
+
+      if (loadingOverlay) loadingOverlay.classList.remove("hidden");
+      if (statusText) {
+        statusText.textContent = title;
+        statusText.style.color = "var(--accent-red)";
+      }
+      if (subText) subText.textContent = "Emergency database console failed to initialize.";
+
+      if (errorBlock) {
+        errorBlock.innerHTML = `
+          <div class="error-card-display">
+            <div class="error-card-title">
+              <i class="fas fa-triangle-exclamation"></i> Initialization Diagnostics Failure
+            </div>
+            <p class="error-card-desc">The browser context failed to authorize or parse the database configuration variables.</p>
+            <div class="error-card-code">${errorText}</div>
+            <div class="error-card-steps">
+              <strong>Recommended resolution variables check:</strong>
+              <ul>
+                <li>Ensure you have replaced <code>PASTE_API_KEY</code> with your real Firebase Web configuration keys in <code>index.html</code>.</li>
+                <li>Verify your Cloud Firestore database rules allow public read permissions: <br><code>allow read: if true;</code></li>
+                <li>Ensure the Cloud Firestore database is provisioned in the Firebase console project.</li>
+              </ul>
+            </div>
+          </div>
+        `;
+        errorBlock.style.display = "block";
+      }
+
+      // Shift spinner indicators styling
+      const spinner = document.querySelector(".double-ring-spinner");
+      const core = document.querySelector(".pulse-core");
+      if (spinner) spinner.style.borderTopColor = "var(--accent-red)";
+      if (core) core.style.backgroundColor = "var(--accent-red)";
+    }
+
+    // --- FIREBASE ENGINE BOOTSTRAP SYSTEM ---
+    let app = null;
+    let db = null;
+    let analytics = null;
+
+    function bootstrapFirebaseEngine() {
+      logEngineEvent("Bootstrapping Firebase client core SDK...", "info");
+      
+      // Configuration values check
+      if (firebaseConfig.apiKey === "PASTE_API_KEY" || !firebaseConfig.apiKey) {
+        const errorText = "Firebase configuration credentials missing or set to placeholder PASTE_API_KEY.";
+        updateSystemConnectivityStatus("fb-status-pill", "failed", "Firebase connection failed. Check firebaseConfig.");
+        logEngineEvent(`Bootstrap failed: ${errorText}`, "error");
+        
+        // Exact prompt required: "Firebase connection failed. Check firebaseConfig."
+        triggerErrorOverlayDisplay("Firebase connection failed. Check firebaseConfig.", errorText);
+        return;
+      }
+
+      try {
+        // Initialize Firebase client
+        app = initializeApp(firebaseConfig);
+        
+        // Initialize Firebase Analytics with safety wrap (handles adblocker blocks)
+        try {
+          analytics = getAnalytics(app);
+          logEngineEvent("Firebase Analytics successfully registered.", "info");
+        } catch (analyticsErr) {
+          console.warn("Firebase Analytics failed to initialize (this is normal if adblockers are active):", analyticsErr);
+          logEngineEvent("Firebase Analytics registration bypassed (blocked or not supported).", "warning");
+        }
+
+        db = getFirestore(app);
+        
+        // "Firebase initialized" must log to console
+        console.log("Firebase initialized");
+
+        updateSystemConnectivityStatus("fb-status-pill", "connected", "Firebase: Connected Client");
+        logEngineEvent("Firebase Core SDK successfully registered.", "success");
+        
+        // Start streaming Firestore database
+        startFirestoreRealtimeListener();
+
+      } catch (err) {
+        console.error("Firebase connection failed. Check firebaseConfig.", err);
+        updateSystemConnectivityStatus("fb-status-pill", "failed", "Firebase connection failed. Check firebaseConfig.");
+        logEngineEvent(`SDK Registration error: ${err.message}`, "error");
+        triggerErrorOverlayDisplay("Firebase connection failed. Check firebaseConfig.", err.message);
+      }
+    }
+
+    // --- WINDOW AND EVENT ELEMENTS BINDING ---
+    document.addEventListener("DOMContentLoaded", () => {
+      // Load Leaflet Map UI components
+      initializeLeafletMap();
+      
+      // Bind Action controls
+      document.getElementById("refresh-view-btn").addEventListener("click", reconnectFirestoreStream);
+      document.getElementById("center-map-btn").addEventListener("click", centerMapOnBounds);
+      document.getElementById("clear-selection-btn").addEventListener("click", clearSelectionState);
+      document.getElementById("copy-latest-coords-btn").addEventListener("click", copyLatestCoordinatesPair);
+      
+      // Bind Debug controls
+      document.getElementById("debug-clear-btn").addEventListener("click", () => {
+        const logsBox = document.getElementById("console-logs-box");
+        if (logsBox) logsBox.innerHTML = "";
+        logEngineEvent("Console log buffer cleared.", "info");
+        triggerToast("Debug logs cleared", "warning");
+      });
+
+      const toggleBtn = document.getElementById("debug-toggle-btn");
+      const footer = document.getElementById("debug-footer");
+      toggleBtn.addEventListener("click", () => {
+        footer.classList.toggle("collapsed");
+        if (footer.classList.contains("collapsed")) {
+          toggleBtn.innerHTML = '<i class="fas fa-chevron-up"></i> Show Console';
+        } else {
+          toggleBtn.innerHTML = '<i class="fas fa-chevron-down"></i> Minimize';
+        }
+      });
+
+      // Bind search filters input elements
+      const searchInput = document.getElementById("phone-search-input");
+      const searchClear = document.getElementById("search-clear-btn");
+      
+      searchInput.addEventListener("input", (e) => {
+        searchQuery = e.target.value;
+        if (searchQuery.trim() !== "") {
+          searchClear.style.display = "block";
+        } else {
+          searchClear.style.display = "none";
+        }
+        renderAlertsFeedAndMarkers();
+      });
+
+      searchClear.addEventListener("click", () => {
+        searchInput.value = "";
+        searchQuery = "";
+        searchClear.style.display = "none";
+        renderAlertsFeedAndMarkers();
+        searchInput.focus();
+      });
+
+      // Bind status filtering pills actions
+      document.querySelectorAll(".filter-btn").forEach(btn => {
+        btn.addEventListener("click", (e) => {
+          document.querySelectorAll(".filter-btn").forEach(b => b.classList.remove("active"));
+          e.target.classList.add("active");
+          
+          currentFilter = e.target.getAttribute("data-filter");
+          logEngineEvent(`Filter criteria switched to: ${currentFilter}`, "info");
+          renderAlertsFeedAndMarkers();
+          
+          // If filtering to latest, select it automatically
+          if (currentFilter === "latest") {
+            const sortedValids = allLocations
+              .filter(loc => loc.isValid)
+              .sort((a, b) => {
+                const tA = parseDocumentTimestamp(a.timestamp);
+                const tB = parseDocumentTimestamp(b.timestamp);
+                if (!tA) return 1;
+                if (!tB) return -1;
+                return tB - tA;
+              });
+            if (sortedValids.length > 0) {
+              selectLocation(sortedValids[0].id, true);
+            }
+          }
+        });
+      });
+
+      // Initialize Firebase core stream
+      bootstrapFirebaseEngine();
+
+      // Trigger automatic relative time refresh tick every 10 seconds
+      setInterval(() => {
+        if (allLocations.length > 0) {
+          renderAlertsFeedAndMarkers();
+          if (selectedLocationId) {
+            const targetLoc = allLocations.find(l => l.id === selectedLocationId);
+            if (targetLoc) {
+              const timestamp = parseDocumentTimestamp(targetLoc.timestamp);
+              const elapsedEl = document.getElementById("insp-elapsed");
+              if (elapsedEl) elapsedEl.textContent = getElapsedTimeLabel(timestamp);
+            }
+          }
+        }
+      }, 10000);
+    });
+
+  </script>
+</body>
+</html>
