@@ -1,0 +1,67 @@
+{
+  "project_info": {
+    "project_number": "345734330880",
+    "project_id": "emergency-response-11a1c",
+    "storage_bucket": "emergency-response-11a1c.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:345734330880:android:4366edfc389a2df28476e5",
+        "android_client_info": {
+          "package_name": "com.example.myapplication"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA6c3A_J8MzzsrWVgNZdTJoBnQQ6tskaYY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:345734330880:android:4366edfc389a2df28476e5",
+        "android_client_info": {
+          "package_name": "com.example.myapplication2"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA6c3A_J8MzzsrWVgNZdTJoBnQQ6tskaYY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:345734330880:android:1f3f165f5e9cb3108476e5",
+        "android_client_info": {
+          "package_name": "com.freelanxo.cloud"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA6c3A_J8MzzsrWVgNZdTJoBnQQ6tskaYY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
